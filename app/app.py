@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import re
 import joblib
 import seaborn as sns
 import matplotlib.pyplot as plt
@@ -75,72 +76,42 @@ def load_data():
         st.info(f"📁 Ruta absoluta esperada: {Path('data/processed/inferencia_df_transformado.csv').absolute()}")
         st.stop()
 
-# Función para actualizar lags recursivamente
-def actualizar_lags(df_producto, predicciones):
-    """Actualiza los lags día por día con las predicciones"""
-    df_actualizado = df_producto.copy()
-    
-    for i in range(len(df_actualizado)):
-        if i == 0:
-            # Día 1: usar lags originales del archivo
-            continue
-        else:
-            # Días 2-30: actualizar lags con predicciones previas
-            # Desplazar lags hacia la derecha
-            for lag in range(7, 1, -1):
-                col_actual = f'unidades_vendidas_lag_{lag}'
-                col_anterior = f'unidades_vendidas_lag_{lag-1}'
-                if col_actual in df_actualizado.columns and col_anterior in df_actualizado.columns:
-                    df_actualizado.loc[df_actualizado.index[i], col_actual] = \
-                        df_actualizado.loc[df_actualizado.index[i-1], col_anterior]
-            
-            # lag_1 = predicción del día anterior
-            if 'unidades_vendidas_lag_1' in df_actualizado.columns:
-                df_actualizado.loc[df_actualizado.index[i], 'unidades_vendidas_lag_1'] = predicciones[i-1]
-            
-            # Actualizar media móvil con las últimas 7 predicciones
-            if 'unidades_vendidas_ma7' in df_actualizado.columns:
-                inicio = max(0, i - 7)
-                valores_ma = predicciones[inicio:i]
-                if len(valores_ma) > 0:
-                    df_actualizado.loc[df_actualizado.index[i], 'unidades_vendidas_ma7'] = np.mean(valores_ma)
-    
-    return df_actualizado
-
 # Función de predicción recursiva
 def predecir_recursivo(modelo, df_producto, feature_names):
-    """Realiza predicciones día por día actualizando lags"""
+    """Realiza predicciones día por día, realimentando cada predicción como
+    lag del día siguiente (forecasting recursivo)."""
     predicciones = []
     df_trabajo = df_producto.copy().sort_values('fecha').reset_index(drop=True)
-    
+
+    # Detectar dinámicamente las columnas de lag presentes
+    # (unidades_vendidas_lag1, ..., _lag7) y ordenarlas por su número de lag.
+    # Hacerlo dinámicamente evita que un cambio de nombre rompa la
+    # realimentación de forma silenciosa (como ocurría con 'lag_1' vs 'lag1').
+    lag_cols = sorted(
+        [c for c in df_trabajo.columns if re.fullmatch(r'unidades_vendidas_lag\d+', c)],
+        key=lambda c: int(c.rsplit('lag', 1)[1])
+    )
+    tiene_ma7 = 'unidades_vendidas_ma7' in df_trabajo.columns
+
     for i in range(len(df_trabajo)):
-        # Preparar features para este día
+        # Predecir el día i con las features actuales
         X_dia = df_trabajo.loc[[i], feature_names]
-        
-        # Predecir
-        pred = modelo.predict(X_dia)[0]
-        pred = max(0, pred)  # No permitir predicciones negativas
+        pred = max(0, modelo.predict(X_dia)[0])  # No permitir predicciones negativas
         predicciones.append(pred)
-        
-        # Actualizar lags para el siguiente día (si no es el último)
+
+        # Realimentar la predicción hacia el día siguiente (si no es el último)
         if i < len(df_trabajo) - 1:
-            # Desplazar lags
-            for lag in range(7, 1, -1):
-                col_actual = f'unidades_vendidas_lag_{lag}'
-                col_anterior = f'unidades_vendidas_lag_{lag-1}'
-                if col_actual in df_trabajo.columns and col_anterior in df_trabajo.columns:
-                    df_trabajo.loc[i+1, col_actual] = df_trabajo.loc[i, col_anterior]
-            
-            # lag_1 = predicción actual
-            if 'unidades_vendidas_lag_1' in df_trabajo.columns:
-                df_trabajo.loc[i+1, 'unidades_vendidas_lag_1'] = pred
-            
-            # Actualizar MA7
-            if 'unidades_vendidas_ma7' in df_trabajo.columns:
+            # Desplazar los lags: lag_n de mañana = lag_(n-1) de hoy
+            for actual, anterior in zip(reversed(lag_cols), reversed(lag_cols[:-1])):
+                df_trabajo.loc[i + 1, actual] = df_trabajo.loc[i, anterior]
+            # El lag más reciente (lag1) de mañana = la predicción de hoy
+            if lag_cols:
+                df_trabajo.loc[i + 1, lag_cols[0]] = pred
+            # Media móvil de los últimos (hasta 7) días predichos
+            if tiene_ma7:
                 inicio = max(0, i - 6)
-                valores_ma = predicciones[inicio:i+1]
-                df_trabajo.loc[i+1, 'unidades_vendidas_ma7'] = np.mean(valores_ma)
-    
+                df_trabajo.loc[i + 1, 'unidades_vendidas_ma7'] = np.mean(predicciones[inicio:i + 1])
+
     return predicciones
 
 # Función para simular ventas

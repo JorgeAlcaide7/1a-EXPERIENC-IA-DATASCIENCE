@@ -1,19 +1,19 @@
 # Dependencias del proyecto 1a-EXPERIENC-IA-DATASCIENCE
-# Versiones fijadas con las que se generaron df_processed.csv y modelo_final.joblib.
 # Instalar con:  pip install -r requirements.txt
+# Requiere Python >= 3.9
 
 # --- Núcleo: modelado y aplicación ---
-streamlit==1.58.0          # app interactiva (app/app.py)
-pandas==3.0.3              # manipulación de datos
-numpy==2.4.6               # cálculo numérico
-scikit-learn==1.8.0        # HistGradientBoostingRegressor (debe coincidir para cargar el .joblib)
-joblib==1.5.3              # serialización del modelo
-matplotlib==3.10.9         # gráficos
-seaborn==0.13.2            # gráficos estadísticos
-holidays==0.97             # calendario de festivos de España
-python-dateutil==2.9.0.post0  # relativedelta en el feature engineering
+streamlit>=1.20.0          # app interactiva (app/app.py). >=1.51.0 requiere Python >=3.10
+pandas>=1.5.0              # manipulación de datos
+numpy>=1.23.0              # cálculo numérico
+scikit-learn==1.8.0        # FIJAR: debe coincidir con la versión usada para entrenar el modelo_final.joblib
+joblib>=1.2.0              # serialización del modelo
+matplotlib>=3.5.0          # gráficos
+seaborn>=0.12.0            # gráficos estadísticos
+holidays>=0.25             # calendario de festivos de España
+python-dateutil>=2.8.0     # relativedelta en el feature engineering
 
 # --- Notebooks (entrenamiento.ipynb, forecasting.ipynb) ---
-jupyter==1.1.1
-notebook==7.5.6
-ipython==9.14.0
+jupyter>=1.0.0
+notebook>=6.5.0
+ipython>=8.0.0

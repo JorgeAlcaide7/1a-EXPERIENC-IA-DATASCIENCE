@@ -94,6 +94,18 @@ notebooks **en orden** desde la carpeta `notebooks/`:
 
 ---
 
+### Ejecutar los tests
+
+El proyecto incluye tests que protegen contra los principales errores ya
+corregidos (lags por producto, forecasting recursivo, compatibilidad
+modelo/datos). Desde la raíz:
+
+```bash
+pytest
+```
+
+---
+
 ## El modelo
 
 - **Algoritmo:** `HistGradientBoostingRegressor` (scikit-learn).
